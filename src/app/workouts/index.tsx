@@ -1,6 +1,7 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
+import { useTemplates } from "@/context/TemplatesContext";
 import {
   FlatList,
   StyleSheet,
@@ -9,20 +10,14 @@ import {
   View,
 } from "react-native";
 
-import { useTemplates } from "@/context/TemplatesContext";
-
 export default function ChooseWorkoutScreen() {
   const { templates } = useTemplates();
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={26} color="#FFFFFF" />
-      </TouchableOpacity>
-
       <Text style={styles.title}>Start Workout</Text>
       <Text style={styles.subtitle}>
-        Choose a workout template
+        Choose a workout template to begin
       </Text>
 
       <FlatList
@@ -32,6 +27,7 @@ export default function ChooseWorkoutScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
+            activeOpacity={0.8}
             onPress={() =>
               router.push({
                 pathname: "/workouts/active",
@@ -39,23 +35,44 @@ export default function ChooseWorkoutScreen() {
               })
             }
           >
-            <View style={{ flex: 1 }}>
+            <View style={styles.cardText}>
               <Text style={styles.cardTitle}>{item.name}</Text>
               <Text style={styles.cardInfo}>
-                {item.exercises.length} exercises
+                {item.exercises.length}{" "}
+                {item.exercises.length === 1
+                  ? "exercise"
+                  : "exercises"}
               </Text>
             </View>
+
             <Ionicons
-              name="play-circle"
-              size={30}
+              name="play-circle-outline"
+              size={26}
               color="#63E6A3"
             />
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <Text style={styles.subtitle}>
-            No templates yet. Create one in Workouts.
-          </Text>
+          <View style={styles.empty}>
+            <Ionicons
+              name="barbell-outline"
+              size={40}
+              color="#7D8589"
+            />
+            <Text style={styles.emptyTitle}>No templates yet</Text>
+            <Text style={styles.emptyText}>
+              Create a template before starting a workout.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => router.push("/(tabs)/workouts")}
+            >
+              <Text style={styles.createButtonText}>
+                Manage Templates
+              </Text>
+            </TouchableOpacity>
+          </View>
         }
       />
     </View>
@@ -73,25 +90,28 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 30,
     fontWeight: "700",
-    marginTop: 24,
   },
   subtitle: {
     color: "#9CA3AF",
-    fontSize: 16,
-    marginTop: 8,
+    fontSize: 15,
+    marginTop: 6,
+    marginBottom: 20,
   },
   list: {
-    paddingTop: 24,
-    paddingBottom: 40,
     gap: 12,
+    paddingBottom: 24,
+    flexGrow: 1,
   },
   card: {
     backgroundColor: "#1B2226",
-    padding: 20,
+    padding: 18,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  cardText: {
+    flex: 1,
   },
   cardTitle: {
     color: "#FFFFFF",
@@ -99,7 +119,35 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cardInfo: {
-    color: "#9CA3AF",
+    color: "#63E6A3",
+    fontSize: 13,
     marginTop: 6,
+  },
+  empty: {
+    alignItems: "center",
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  emptyTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  emptyText: {
+    color: "#9CA3AF",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  createButton: {
+    backgroundColor: "#63E6A3",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  createButtonText: {
+    color: "#101416",
+    fontWeight: "700",
   },
 });

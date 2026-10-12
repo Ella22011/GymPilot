@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,7 +20,7 @@ export default function HomeScreen() {
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Refresh the workout history whenever Home becomes active.
+  // Refresh workout history whenever Home becomes active.
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -53,7 +54,7 @@ export default function HomeScreen() {
     ),
   ).size;
 
-  // Count exercises that have a new heaviest completed set.
+  // Count exercises with a completed set heavier than previous sets.
   const personalRecords = new Map<string, number>();
 
   sessions.forEach((session) => {
@@ -71,8 +72,32 @@ export default function HomeScreen() {
     });
   });
 
+  // Preserve the current Start Workout behavior.
   const startWorkout = () => {
-    router.push("/workouts/active");
+    if (templates.length === 0) {
+      Alert.alert(
+        "No templates found",
+        "Please create a workout template first before starting a workout.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Go to Templates",
+            onPress: () => router.push("/(tabs)/workouts"),
+          },
+        ],
+      );
+      return;
+    }
+
+    router.push({
+      pathname: "/workouts/active",
+      params: { templateId: templates[0].id },
+    });
+  };
+
+  // Open template management without starting a workout.
+  const manageTemplates = () => {
+    router.push("/(tabs)/workouts");
   };
 
   const openHistory = () => {
@@ -126,10 +151,10 @@ export default function HomeScreen() {
         <Text style={styles.startButtonText}>Start Workout</Text>
       </TouchableOpacity>
 
-      {/* Manage workout templates */}
+      {/* Manage templates separately */}
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => router.push("/workouts")}
+        onPress={manageTemplates}
         activeOpacity={0.8}
       >
         <Ionicons name="barbell-outline" size={20} color="#63E6A3" />
