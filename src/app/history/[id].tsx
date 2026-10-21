@@ -13,6 +13,7 @@ import {
 
 import { deleteWorkoutSession, getWorkoutSession } from "@/database/workouts";
 import type { WorkoutSession } from "@/types/sessions";
+import { exerciseKey } from "@/utils/progress";
 
 function confirmDelete(name: string, onConfirm: () => void) {
   const message = `Delete "${name}" from your history? This can't be undone.`;
@@ -113,9 +114,21 @@ export default function HistoryDetailScreen() {
 
           {session.exercises.map((exercise, index) => (
             <View key={`${exercise.id}-${index}`} style={styles.card}>
-              <Text style={styles.exerciseName}>
-                {exercise.name}
-              </Text>
+              <TouchableOpacity
+                style={styles.exerciseHeader}
+                onPress={() =>
+                  router.push({
+                    pathname: "/exercise/[key]",
+                    params: { key: exerciseKey(exercise.name) },
+                  })
+                }
+              >
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                <View style={styles.exerciseHistoryLink}>
+                  <Ionicons name="stats-chart" size={14} color="#63E6A3" />
+                  <Ionicons name="chevron-forward" size={16} color="#63E6A3" />
+                </View>
+              </TouchableOpacity>
 
               {exercise.sets.map((set, setIndex) => (
                 <Text key={set.id} style={styles.setText}>
@@ -188,11 +201,22 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 12,
   },
+  exerciseHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
   exerciseName: {
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 12,
+    flexShrink: 1,
+  },
+  exerciseHistoryLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   setText: {
     color: "#9CA3AF",

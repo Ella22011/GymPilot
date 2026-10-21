@@ -107,7 +107,7 @@ export function buildProgressSummary(
       );
       const bestE1rm = Math.max(...done.map((s) => estimateOneRepMax(s.weight, s.reps)));
 
-      const key = exercise.name.trim().toLowerCase();
+      const key = exerciseKey(exercise.name);
       let progress = exerciseMap.get(key);
       if (!progress) {
         progress = {
@@ -187,4 +187,114 @@ export function formatVolume(kg: number) {
 export function formatShortDate(date: Date | string) {
   const d = typeof date === "string" ? new Date(date) : date;
   return `${d.getDate()}.${d.getMonth() + 1}.`;
+}
+
+/** Key used to treat "Bench Press" and "bench press " as the same exercise. */
+export function exerciseKey(name: string) {
+  return name.trim().toLowerCase();
+}
+
+export type ExerciseHistoryEntry = ExerciseSessionResult & {
+  workoutName: string;
+  setsDone: { weight: number; reps: number }[];
+  totalReps: number;
+  /** Beat the previous heaviest top set (not marked on the first workout). */
+  isWeightPr: boolean;
+  /** Beat the previous best estimated 1RM (not marked on the first workout). */
+  isE1rmPr: boolean;
+};
+
+export type ExerciseHistory = {
+  key: string;
+  name: string;
+  /** Newest first. */
+  entries: ExerciseHistoryEntry[];
+  prWeight: number;
+  prReps: number;
+  prDate: string;
+  bestE1rm: number;
+  totalVolume: number;
+  totalSets: number;
+  totalReps: number;
+  firstDate: string;
+  lastDate: string;
+};
+
+/** Every completed set of one exercise across all workouts, with records marked. */
+export function buildExerciseHistory(
+  sessions: WorkoutSession[],
+  key: string,
+): ExerciseHistory | null {
+  const ordered = [...sessions].sort(
+    (a, b) => new Date(a.finishedAt).getTime() - new Date(b.finishedAt).getTime(),
+  );
+
+  const chronological: ExerciseHistoryEntry[] = [];
+  let name = "";
+  let bestWeight = -1;
+  let bestReps = 0;
+  let bestE1rmSoFar = -1;
+  let prDate = "";
+
+  for (const session of ordered) {
+    // An exercise could appear twice in one workout; merge those sets.
+    const done = session.exercises
+      .filter((e) => exerciseKey(e.name) === key)
+      .flatMap((e) => {
+        name ||= e.name.trim();
+        return completedSets(e.sets);
+      });
+    if (done.length === 0) continue;
+
+    const top = done.reduce((best, s) =>
+      s.weight > best.weight || (s.weight === best.weight && s.reps > best.reps)
+        ? s
+        : best,
+    );
+    const e1rm = Math.max(...done.map((s) => estimateOneRepMax(s.weight, s.reps)));
+    const isFirst = chronological.length === 0;
+
+    const beatsWeight =
+      top.weight > bestWeight || (top.weight === bestWeight && top.reps > bestReps);
+    const beatsE1rm = e1rm > bestE1rmSoFar + 1e-9;
+
+    chronological.push({
+      sessionId: session.id,
+      date: session.finishedAt,
+      workoutName: session.name,
+      topWeight: top.weight,
+      topReps: top.reps,
+      bestE1rm: e1rm,
+      volume: setVolume(done),
+      sets: done.length,
+      setsDone: done,
+      totalReps: done.reduce((sum, s) => sum + s.reps, 0),
+      isWeightPr: !isFirst && beatsWeight,
+      isE1rmPr: !isFirst && beatsE1rm,
+    });
+
+    if (beatsWeight) {
+      bestWeight = top.weight;
+      bestReps = top.reps;
+      prDate = session.finishedAt;
+    }
+    if (beatsE1rm) bestE1rmSoFar = e1rm;
+  }
+
+  if (chronological.length === 0) return null;
+
+  return {
+    key,
+    name,
+    entries: [...chronological].reverse(),
+    prWeight: bestWeight,
+    prReps: bestReps,
+    prDate,
+    bestE1rm: bestE1rmSoFar,
+    totalVolume: chronological.reduce((sum, e) => sum + e.volume, 0),
+    totalSets: chronological.reduce((sum, e) => sum + e.sets, 0),
+    totalReps: chronological.reduce((sum, e) => sum + e.totalReps, 0),
+    firstDate: chronological[0].date,
+    lastDate: chronological[chronological.length - 1].date,
+  };
 }

@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -22,6 +22,10 @@ import {
 } from "@/utils/progress";
 
 const CHART_SESSIONS = 8;
+
+function openExerciseHistory(key: string) {
+  router.push({ pathname: "/exercise/[key]", params: { key } });
+}
 
 function compactVolume(kg: number) {
   return kg >= 1000 ? `${(kg / 1000).toFixed(1)}t` : String(Math.round(kg));
@@ -97,6 +101,14 @@ function ExerciseDetail({ exercise }: { exercise: ExerciseProgress }) {
           </>
         )}
       </View>
+
+      <TouchableOpacity
+        style={styles.historyLink}
+        onPress={() => openExerciseHistory(exercise.key)}
+      >
+        <Text style={styles.historyLinkText}>View full history</Text>
+        <Ionicons name="chevron-forward" size={16} color="#63E6A3" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -107,8 +119,6 @@ export default function ProgressScreen() {
   const [error, setError] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  const scrollRef = useRef<ScrollView>(null);
-  const exerciseSectionY = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -188,16 +198,10 @@ export default function ProgressScreen() {
   const currentWeek = summary.weeklyVolume[summary.weeklyVolume.length - 1];
   const weeksWithTraining = summary.weeklyVolume.filter((w) => w.workouts > 0).length;
 
-  const selectExercise = (key: string, scroll: boolean) => {
-    setSelectedKey(key);
-    if (scroll) {
-      scrollRef.current?.scrollTo({ y: exerciseSectionY.current - 12, animated: true });
-    }
-  };
+  const selectExercise = (key: string) => setSelectedKey(key);
 
   return (
     <ScrollView
-      ref={scrollRef}
       style={styles.scroll}
       contentContainerStyle={styles.container}
     >
@@ -226,9 +230,7 @@ export default function ProgressScreen() {
         <Text style={styles.chartFootnote}>Weight × reps of completed sets, per week</Text>
       </View>
 
-      <View onLayout={(e) => (exerciseSectionY.current = e.nativeEvent.layout.y)}>
-        <Text style={styles.sectionTitle}>Exercise progress</Text>
-      </View>
+      <Text style={styles.sectionTitle}>Exercise progress</Text>
 
       <ScrollView
         horizontal
@@ -242,7 +244,7 @@ export default function ProgressScreen() {
             <TouchableOpacity
               key={exercise.key}
               style={[styles.chip, isSelected && styles.chipSelected]}
-              onPress={() => selectExercise(exercise.key, false)}
+              onPress={() => selectExercise(exercise.key)}
             >
               <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
                 {exercise.name}
@@ -260,7 +262,7 @@ export default function ProgressScreen() {
           <TouchableOpacity
             key={exercise.key}
             style={[styles.prRow, index > 0 && styles.prRowBorder]}
-            onPress={() => selectExercise(exercise.key, true)}
+            onPress={() => openExerciseHistory(exercise.key)}
           >
             <View style={styles.prIcon}>
               <Ionicons name="trophy" size={16} color="#F5C451" />
@@ -275,6 +277,7 @@ export default function ProgressScreen() {
             <Text style={styles.prValue}>
               {formatWeight(exercise.prWeight)} kg × {exercise.prReps}
             </Text>
+            <Ionicons name="chevron-forward" size={18} color="#7D8589" />
           </TouchableOpacity>
         ))}
       </View>
@@ -436,6 +439,23 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     fontSize: 13,
     flexShrink: 1,
+  },
+
+  historyLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#242B2F",
+  },
+
+  historyLinkText: {
+    color: "#63E6A3",
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   prList: {
