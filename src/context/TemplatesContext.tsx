@@ -1,72 +1,65 @@
-import { createContext, ReactNode, useContext, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
-import { createId, WorkoutTemplate } from "@/types/workout";
+import * as templateDb from "@/database/templates";
+import { WorkoutTemplate } from "@/types/workout";
 
 type TemplatesContextValue = {
   templates: WorkoutTemplate[];
   getTemplate: (id: string) => WorkoutTemplate | undefined;
-  saveTemplate: (template: WorkoutTemplate) => void;
-  deleteTemplate: (id: string) => void;
+  saveTemplate: (template: WorkoutTemplate) => Promise<void>;
+  deleteTemplate: (id: string) => Promise<void>;
 };
 
 const TemplatesContext = createContext<TemplatesContextValue | null>(null);
 
-const exercise = (name: string, plannedSets: number, plannedReps: number) => ({
-  id: createId(),
-  name,
-  plannedSets,
-  plannedReps,
-});
-
-// Example templates so the screen isn't empty on first launch.
-const initialTemplates: WorkoutTemplate[] = [
-  {
-    id: createId(),
-    name: "Push Day",
-    exercises: [
-      exercise("Bench Press", 4, 8),
-      exercise("Overhead Press", 3, 8),
-      exercise("Incline Dumbbell Press", 3, 10),
-      exercise("Triceps Pushdown", 3, 12),
-    ],
-  },
-  {
-    id: createId(),
-    name: "Pull Day",
-    exercises: [
-      exercise("Deadlift", 3, 5),
-      exercise("Pull-Up", 3, 8),
-      exercise("Barbell Row", 3, 10),
-      exercise("Biceps Curl", 3, 12),
-    ],
-  },
-  {
-    id: createId(),
-    name: "Leg Day",
-    exercises: [
-      exercise("Squat", 4, 6),
-      exercise("Romanian Deadlift", 3, 10),
-      exercise("Leg Press", 3, 12),
-      exercise("Calf Raise", 3, 15),
-    ],
-  },
-];
-
+/**
+ * Loads templates from the SQLite database once at startup and keeps them in
+ * memory, so screens can read them synchronously. Every change is written to
+ * the database and then the list is reloaded from it.
+ */
 export function TemplatesProvider({ children }: { children: ReactNode }) {
-  const [templates, setTemplates] = useState<WorkoutTemplate[]>(initialTemplates);
+  const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  const reload = async () => {
+    setTemplates(await templateDb.getTemplates());
+  };
+
+  useEffect(() => {
+    reload()
+      .catch((error) => console.error("Failed to load templates", error))
+      .finally(() => setLoaded(true));
+  }, []);
 
   const value: TemplatesContextValue = {
     templates,
     getTemplate: (id) => templates.find((t) => t.id === id),
-    saveTemplate: (template) =>
-      setTemplates((current) =>
-        current.some((t) => t.id === template.id)
-          ? current.map((t) => (t.id === template.id ? template : t))
-          : [...current, template]
-      ),
-    deleteTemplate: (id) =>
-      setTemplates((current) => current.filter((t) => t.id !== id)),
+    saveTemplate: async (template) => {
+      try {
+        await templateDb.saveTemplate(template);
+        await reload();
+      } catch (error) {
+        console.error("Failed to save template", error);
+      }
+    },
+    deleteTemplate: async (id) => {
+      try {
+        await templateDb.deleteTemplate(id);
+        await reload();
+      } catch (error) {
+        console.error("Failed to delete template", error);
+      }
+    },
   };
+
+  // Wait for the first load so screens never see an empty list by mistake.
+  if (!loaded) return null;
 
   return (
     <TemplatesContext.Provider value={value}>{children}</TemplatesContext.Provider>

@@ -1,7 +1,6 @@
 import type { WorkoutSession } from "@/types/sessions";
-import * as SQLite from "expo-sqlite";
 
-const dbPromise = SQLite.openDatabaseAsync("gympilot.db");
+import { dbPromise } from "./db";
 
 export async function initializeWorkoutDatabase() {
   const db = await dbPromise;
