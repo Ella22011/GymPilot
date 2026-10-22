@@ -65,7 +65,7 @@ function TemplateCard({
 }
 
 export default function WorkoutsScreen() {
-  const { templates } = useTemplates();
+  const { templates, error, reload } = useTemplates();
 
   return (
     <View style={styles.container}>
@@ -86,6 +86,15 @@ export default function WorkoutsScreen() {
           <Ionicons name="add" size={26} color="#101416" />
         </TouchableOpacity>
       </View>
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={reload} accessibilityRole="button">
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <FlatList
         data={templates}
@@ -196,5 +205,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     marginTop: 6,
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#2A1C1E",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 16,
+  },
+  errorText: {
+    flex: 1,
+    color: "#F87171",
+    fontSize: 14,
+  },
+  retryText: {
+    color: "#63E6A3",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

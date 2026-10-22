@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#374151",
     alignItems: "center",
-    justify: "center",
+    justifyContent: "center",
   },
   checked: {
     backgroundColor: "#63E6A3",

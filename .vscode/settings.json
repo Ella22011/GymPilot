@@ -3,5 +3,9 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "python.terminal.useEnvFile": true,
+  "appService.zipIgnorePattern": ["node_modules{,/**}", ".vscode{,/**}"],
+  "appService.defaultWebAppToDeploy": "/subscriptions/da2db2bb-e86f-4558-8b95-e763104652b3/resourceGroups/GymPilot/providers/Microsoft.Web/sites/GymPilot",
+  "appService.deploySubpath": "server"
 }
