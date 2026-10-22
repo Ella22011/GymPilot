@@ -1,7 +1,6 @@
 import type { WorkoutSession } from "@/types/sessions";
-import * as SQLite from "expo-sqlite";
 
-const dbPromise = SQLite.openDatabaseAsync("gympilot.db");
+import { dbPromise } from "./db";
 
 export async function initializeWorkoutDatabase() {
   const db = await dbPromise;
@@ -56,41 +55,83 @@ export async function saveWorkoutSession(session: WorkoutSession) {
       ],
     );
 
-    for (
-      let exerciseIndex = 0;
-      exerciseIndex < session.exercises.length;
-      exerciseIndex++
-    ) {
-      const exercise = session.exercises[exerciseIndex];
+    await insertExercisesAndSets(session);
+  });
+}
+
+/** Replaces a saved workout's name and all of its exercises and sets. */
+export async function updateWorkoutSession(session: WorkoutSession) {
+  await initializeWorkoutDatabase();
+  const db = await dbPromise;
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE workout_sessions SET name = ? WHERE id = ?`,
+      [session.name, session.id],
+    );
+
+    await deleteExercisesAndSets(session.id);
+    await insertExercisesAndSets(session);
+  });
+}
+
+export async function deleteWorkoutSession(id: string) {
+  await initializeWorkoutDatabase();
+  const db = await dbPromise;
+
+  await db.withTransactionAsync(async () => {
+    await deleteExercisesAndSets(id);
+    await db.runAsync(`DELETE FROM workout_sessions WHERE id = ?`, [id]);
+  });
+}
+
+// Must be called inside a transaction.
+async function deleteExercisesAndSets(sessionId: string) {
+  const db = await dbPromise;
+  await db.runAsync(`DELETE FROM workout_sets WHERE session_id = ?`, [sessionId]);
+  await db.runAsync(`DELETE FROM workout_exercises WHERE session_id = ?`, [
+    sessionId,
+  ]);
+}
+
+// Must be called inside a transaction.
+async function insertExercisesAndSets(session: WorkoutSession) {
+  const db = await dbPromise;
+
+  for (
+    let exerciseIndex = 0;
+    exerciseIndex < session.exercises.length;
+    exerciseIndex++
+  ) {
+    const exercise = session.exercises[exerciseIndex];
+
+    await db.runAsync(
+      `INSERT INTO workout_exercises
+       (session_id, exercise_index, exercise_id, name)
+       VALUES (?, ?, ?, ?)`,
+      [session.id, exerciseIndex, exercise.id, exercise.name],
+    );
+
+    for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
+      const set = exercise.sets[setIndex];
 
       await db.runAsync(
-        `INSERT INTO workout_exercises
-         (session_id, exercise_index, exercise_id, name)
-         VALUES (?, ?, ?, ?)`,
-        [session.id, exerciseIndex, exercise.id, exercise.name],
+        `INSERT INTO workout_sets
+         (session_id, exercise_index, set_index,
+          set_id, weight, reps, completed)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          session.id,
+          exerciseIndex,
+          setIndex,
+          set.id,
+          set.weight,
+          set.reps,
+          set.completed ? 1 : 0,
+        ],
       );
-
-      for (let setIndex = 0; setIndex < exercise.sets.length; setIndex++) {
-        const set = exercise.sets[setIndex];
-
-        await db.runAsync(
-          `INSERT INTO workout_sets
-           (session_id, exercise_index, set_index,
-            set_id, weight, reps, completed)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            session.id,
-            exerciseIndex,
-            setIndex,
-            set.id,
-            set.weight,
-            set.reps,
-            set.completed ? 1 : 0,
-          ],
-        );
-      }
     }
-  });
+  }
 }
 
 type SessionRow = {
