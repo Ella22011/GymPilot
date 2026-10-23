@@ -3,6 +3,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  AlertButton,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,6 +31,67 @@ type DraftExercise = {
   target: string;
   sets: DraftSet[];
 };
+
+type UntickedChoice = "markDone" | "skip";
+
+const countUnticked = (list: DraftExercise[]) =>
+  list.reduce(
+    (total, exercise) =>
+      total + exercise.sets.filter((set) => !set.completed).length,
+    0,
+  );
+
+/** Marks every set as done, in one exercise or (without an id) in all of them. */
+const markAllDone = (list: DraftExercise[], exerciseId?: string) =>
+  list.map((exercise) =>
+    exerciseId && exercise.id !== exerciseId
+      ? exercise
+      : {
+          ...exercise,
+          sets: exercise.sets.map((set) => ({ ...set, completed: true })),
+        },
+  );
+
+/**
+ * Warns that some sets aren't ticked, because only ticked sets are saved.
+ * The user can go back, mark them as done, or (when allowSkip) continue without them.
+ */
+function askAboutUntickedSets(
+  count: number,
+  where: string,
+  allowSkip: boolean,
+  onChoice: (choice: UntickedChoice) => void,
+) {
+  const setsText = count === 1 ? "1 set isn't" : `${count} sets aren't`;
+  const message = `${setsText} marked as done ${where}. Only ticked sets are saved to your history.`;
+
+  // window.confirm only has OK and Cancel, so the web asks in two steps.
+  if (Platform.OS === "web") {
+    const cancelText = allowSkip ? "other options" : "go back";
+    if (window.confirm(`${message}\n\nOK: mark them as done\nCancel: ${cancelText}`)) {
+      onChoice("markDone");
+    } else if (
+      allowSkip &&
+      window.confirm("Continue without the unticked sets?\n\nOK: continue\nCancel: go back")
+    ) {
+      onChoice("skip");
+    }
+    return;
+  }
+
+  const buttons: AlertButton[] = [
+    { text: "Go back", style: "cancel" },
+    { text: "Mark as done", onPress: () => onChoice("markDone") },
+  ];
+  if (allowSkip) {
+    buttons.push({
+      text: "Continue without them",
+      style: "destructive",
+      onPress: () => onChoice("skip"),
+    });
+  }
+  Alert.alert("Unticked sets", message, buttons);
+}
 
 export default function ActiveWorkoutScreen() {
   const { templateId } = useLocalSearchParams<{
@@ -150,10 +213,52 @@ export default function ActiveWorkoutScreen() {
     );
   };
 
-  const finishWorkout = async () => {
+  const goToNextExercise = () => {
+    const advance = () => setCurrentExerciseIndex((prev) => prev + 1);
+    const unticked = countUnticked([activeExercise]);
+
+    if (unticked === 0) {
+      advance();
+      return;
+    }
+
+    askAboutUntickedSets(unticked, `in ${activeExercise.name}`, true, (choice) => {
+      if (choice === "markDone") {
+        setExercises((current) => markAllDone(current, activeExercise.id));
+      }
+      advance();
+    });
+  };
+
+  const finishWorkout = () => {
     if (saving || !template) return;
 
-    const completedCount = exercises.reduce(
+    const unticked = countUnticked(exercises);
+    if (unticked === 0) {
+      void saveWorkout(exercises);
+      return;
+    }
+
+    // Skipping only makes sense if something is left to save.
+    const anyCompleted = exercises.some((exercise) =>
+      exercise.sets.some((set) => set.completed),
+    );
+
+    askAboutUntickedSets(unticked, "in this workout", anyCompleted, (choice) => {
+      if (choice === "markDone") {
+        const allDone = markAllDone(exercises);
+        setExercises(allDone);
+        void saveWorkout(allDone);
+      } else {
+        void saveWorkout(exercises);
+      }
+    });
+  };
+
+  const saveWorkout = async (list: DraftExercise[]) => {
+    if (saving || !template) return;
+
+    const completedCount = list.reduce(
       (total, exercise) =>
         total + exercise.sets.filter((set) => set.completed).length,
       0,
@@ -167,7 +272,7 @@ export default function ActiveWorkoutScreen() {
       return;
     }
 
-    const invalid = exercises.some((exercise) =>
+    const invalid = list.some((exercise) =>
       exercise.sets.some(
         (set) =>
           set.completed &&
@@ -188,7 +293,7 @@ export default function ActiveWorkoutScreen() {
       return;
     }
 
-    const completedExercises: SessionExercise[] = exercises
+    const completedExercises: SessionExercise[] = list
       .map((exercise) => ({
         id: exercise.id,
         name: exercise.name,
@@ -370,7 +475,7 @@ export default function ActiveWorkoutScreen() {
         {currentExerciseIndex < exercises.length - 1 ? (
           <TouchableOpacity
             style={styles.nextExerciseButton}
-            onPress={() => setCurrentExerciseIndex((prev) => prev + 1)}
+            onPress={goToNextExercise}
           >
             <Text style={styles.nextExerciseText}>Next Exercise →</Text>
           </TouchableOpacity>
